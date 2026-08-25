@@ -26,7 +26,6 @@
     --amber:      #F2B33D;
     --haze:       #B9A8CE;
     --ink:        #F3EEF8;
-    --frame:      #241738;
 
     --fd: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
     --fm: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -34,186 +33,179 @@
 
   * { box-sizing: border-box; }
 
+  html, body { height: 100%; }
+
   body {
     margin: 0;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
     background-color: var(--night-deep);
-    background-image:
-      radial-gradient(120% 80% at 50% 0%, #2A1A4A 0%, var(--night) 45%, var(--night-deep) 100%);
     color: var(--ink);
     font-family: var(--fm);
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-  }
-
-  .wrap {
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(10px, 1.8vh, 18px);
-    padding: clamp(12px, 2.5vh, 26px) 16px;
-  }
-
-  /* ---- lockup ---- */
-  .lockup {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .lockup h1 {
-    margin: 0;
-    font-family: var(--fd);
-    font-weight: 800;
-    font-size: clamp(20px, 3.4vh, 30px);
-    letter-spacing: -0.02em;
-    line-height: 1;
-    color: var(--ink);
-  }
-  .lockup h1 em {
-    font-style: normal;
-    color: var(--finch);
-  }
-  .tagline {
-    font-size: 11px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--haze);
-    opacity: 0.75;
-  }
-
-  /* ---- cabinet ---- */
-  .frame {
-    position: relative;
-    aspect-ratio: 400 / 640;
-    height: min(70dvh, 680px);
-    width: auto;
-    max-width: 100%;
-    border-radius: 18px;
-    padding: 8px;
-    background: linear-gradient(160deg, #3A2757 0%, var(--frame) 55%, #190F2B 100%);
-    box-shadow:
-      0 0 0 1px rgba(185, 168, 206, 0.16),
-      0 28px 70px -20px rgba(0, 0, 0, 0.8),
-      0 0 90px -30px rgba(47, 221, 196, 0.28);
-  }
-
-  .screen {
-    position: relative;
-    container-type: inline-size;
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--night);
+    overscroll-behavior: none;
   }
 
   canvas {
-    display: block;
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
+    display: block;
     touch-action: manipulation;
-    cursor: pointer;
-  }
-  canvas:focus-visible {
-    outline: 2px solid rgba(47, 221, 196, 0.45);
-    outline-offset: -2px;
+    background: var(--night);
   }
 
-  /* screen glass */
-  .glass {
+  /* screen glass — never intercepts input */
+  .vignette {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      radial-gradient(130% 100% at 50% 40%, rgba(0,0,0,0) 55%, rgba(10,6,20,0.55) 100%);
+    background: radial-gradient(125% 95% at 50% 42%, rgba(0,0,0,0) 52%, rgba(9,5,18,0.6) 100%);
   }
+
+  /* ---- corner controls ---- */
+  .hud {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    display: flex;
+    gap: 8px;
+    z-index: 3;
+  }
+
+  .icon {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 11px;
+    color: var(--haze);
+    background: rgba(19, 12, 36, 0.5);
+    border: 1px solid rgba(185, 168, 206, 0.22);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
+  }
+  .icon:hover { color: var(--ink); border-color: rgba(185, 168, 206, 0.5); background: rgba(29, 19, 52, 0.66); }
+  .icon:focus-visible { outline: 2px solid var(--finch); outline-offset: 2px; }
+  .icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .icon .slash { opacity: 0; }
+  .icon.off { color: rgba(185, 168, 206, 0.5); }
+  .icon.off .slash { opacity: 1; }
+  .icon[hidden] { display: none; }
+  .icon .resume { display: none; }
+  .icon.playing .resume { display: inline; }
+  .icon.playing .bars { display: none; }
 
   /* ---- overlays ---- */
   .panel {
     position: absolute;
     inset: 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(9px, 3.4cqw, 15px);
-    padding: clamp(16px, 7cqw, 30px);
+    gap: clamp(12px, 1.9vmin, 20px);
+    padding: clamp(22px, 5vmin, 56px);
     text-align: center;
-    background: rgba(13, 8, 26, 0.62);
-    backdrop-filter: blur(2px);
+    background: radial-gradient(90% 70% at 50% 50%, rgba(13, 8, 26, 0.78) 0%, rgba(9, 5, 18, 0.9) 100%);
   }
   .panel[hidden] { display: none; }
 
-  .panel .kicker {
-    font-size: clamp(8px, 2.6cqw, 10px);
-    letter-spacing: 0.24em;
+  .kicker {
+    margin: 0;
+    font-size: clamp(9px, 1.35vmin, 12px);
+    letter-spacing: 0.26em;
     text-transform: uppercase;
     color: var(--amber);
   }
+
+  .wordmark {
+    margin: 0;
+    font-family: var(--fd);
+    font-weight: 800;
+    font-size: clamp(38px, 9vmin, 92px);
+    line-height: 0.94;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+  .wordmark em { font-style: normal; color: var(--finch); }
+
   .panel h2 {
     margin: 0;
     font-family: var(--fd);
     font-weight: 800;
-    font-size: clamp(21px, 8.6cqw, 38px);
-    line-height: 1.04;
-    letter-spacing: -0.025em;
+    font-size: clamp(28px, 6.4vmin, 62px);
+    line-height: 1.02;
+    letter-spacing: -0.03em;
     text-wrap: balance;
   }
-  .panel p {
+
+  .panel p.copy {
     margin: 0;
-    max-width: 30ch;
-    font-size: clamp(10.5px, 3.3cqw, 13px);
-    line-height: 1.6;
+    max-width: 34ch;
+    font-size: clamp(12px, 1.9vmin, 16px);
+    line-height: 1.7;
     color: var(--haze);
   }
 
   kbd {
     font-family: var(--fm);
-    font-size: 11px;
-    padding: 3px 7px;
+    font-size: 0.85em;
+    padding: 2px 6px;
     border-radius: 5px;
     background: rgba(243, 238, 248, 0.09);
     border: 1px solid rgba(243, 238, 248, 0.2);
     border-bottom-width: 2px;
     color: var(--ink);
+    white-space: nowrap;
   }
 
   .btn {
-    margin-top: 4px;
+    margin-top: clamp(2px, 1vmin, 10px);
     font-family: var(--fm);
     font-weight: 600;
-    font-size: clamp(10px, 3cqw, 12px);
-    letter-spacing: 0.14em;
+    font-size: clamp(11px, 1.6vmin, 14px);
+    letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--night-deep);
     background: var(--finch);
     border: 0;
     border-radius: 999px;
-    padding: clamp(9px, 3cqw, 12px) clamp(18px, 6.5cqw, 26px);
+    padding: clamp(11px, 1.7vmin, 16px) clamp(24px, 3.4vmin, 34px);
     cursor: pointer;
-    transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
-    box-shadow: 0 8px 24px -10px rgba(47, 221, 196, 0.9);
+    transition: transform 120ms ease, background 120ms ease;
+    box-shadow: 0 10px 30px -12px rgba(47, 221, 196, 0.95);
   }
   .btn:hover { background: #4CEBD4; transform: translateY(-1px); }
   .btn:active { transform: translateY(1px); }
   .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
-  /* score readout inside game-over panel */
+  .keyline {
+    margin: 0;
+    font-size: clamp(10px, 1.45vmin, 12.5px);
+    color: var(--haze);
+    opacity: 0.72;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .keyline .sep { opacity: 0.4; }
+
+  /* score tally on the game-over panel */
   .tally {
     display: flex;
-    gap: clamp(24px, 9cqw, 36px);
-    margin-top: 2px;
+    gap: clamp(28px, 5vmin, 52px);
   }
-  .tally div {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
+  .tally div { display: flex; flex-direction: column; gap: 6px; }
   .tally span {
-    font-size: 9px;
+    font-size: clamp(8px, 1.15vmin, 10px);
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--haze);
@@ -222,7 +214,7 @@
   .tally strong {
     font-family: var(--fd);
     font-weight: 800;
-    font-size: clamp(26px, 8cqw, 34px);
+    font-size: clamp(34px, 6vmin, 62px);
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
@@ -230,41 +222,22 @@
   .tally .best { color: var(--amber); }
 
   .fresh {
-    font-size: 10px;
+    margin: 0;
+    font-size: clamp(9px, 1.3vmin, 11px);
     letter-spacing: 0.2em;
     text-transform: uppercase;
     color: var(--amber);
-    min-height: 12px;
+    min-height: 1em;
   }
 
-  /* ---- footer strip ---- */
-  .strip {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    justify-content: center;
-    font-size: 11px;
-    color: var(--haze);
-    opacity: 0.78;
+  @media (max-width: 430px) {
+    .icon { width: 33px; height: 33px; border-radius: 10px; }
+    .icon svg { width: 17px; height: 17px; }
+    .hud { gap: 6px; }
   }
-  .strip .dot { opacity: 0.4; }
 
-  .mute {
-    font: inherit;
-    color: var(--haze);
-    background: none;
-    border: 1px solid rgba(185, 168, 206, 0.3);
-    border-radius: 999px;
-    padding: 4px 12px;
-    cursor: pointer;
-  }
-  .mute:hover { color: var(--ink); border-color: rgba(185, 168, 206, 0.6); }
-  .mute:focus-visible { outline: 2px solid var(--finch); outline-offset: 2px; }
-
-  @media (max-height: 620px) {
-    .lockup, .strip { display: none; }
-    .frame { height: 94vh; }
+  @media (prefers-reduced-motion: reduce) {
+    .btn { transition: none; }
   }
 </style>
 <style>
@@ -279,62 +252,90 @@
 <!-- FONTS:END -->
 
 
-<div class="wrap">
-  <div class="lockup">
-    <h1>Vesper <em>Finch</em></h1>
-    <span class="tagline">Dusk run through the spires</span>
+<canvas id="stage" aria-label="Vesper Finch. Press space or click to flap."></canvas>
+<div class="vignette"></div>
+
+<div class="hud">
+  <button class="icon" id="pauseBtn" type="button" title="Pause" aria-label="Pause">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g class="bars"><path d="M9 5v14"/><path d="M15 5v14"/></g>
+      <path class="resume" d="M8 5l11 7-11 7z"/>
+    </svg>
+  </button>
+  <button class="icon" id="musicBtn" type="button" title="Music" aria-label="Music on">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>
+      <path class="slash" d="M3 21L21 3"/>
+    </svg>
+  </button>
+  <button class="icon" id="sfxBtn" type="button" title="Sound effects" aria-label="Sound effects on">
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9.5a4 4 0 010 5"/>
+      <path class="slash" d="M3 21L21 3"/>
+    </svg>
+  </button>
+  <button class="icon" id="fullBtn" type="button" title="Fullscreen" aria-label="Enter fullscreen" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/>
+    </svg>
+  </button>
+</div>
+
+<div class="panel" id="startPanel">
+  <p class="kicker">One button · endless</p>
+  <h1 class="wordmark">Vesper <em>Finch</em></h1>
+  <p class="copy">Dusk over the canyon. Beat your wings to keep the finch aloft, and thread every gap in the spires — stone or sand ends the run.</p>
+  <button class="btn" id="startBtn" type="button">Begin the run</button>
+  <p class="keyline">
+    <span><kbd>Space</kbd> <kbd>↑</kbd> or tap to flap</span>
+    <span class="sep">·</span>
+    <span><kbd>P</kbd> to pause</span>
+  </p>
+</div>
+
+<div class="panel" id="overPanel" hidden>
+  <p class="kicker">The run ends</p>
+  <h2 id="overTitle">Grounded</h2>
+  <div class="tally">
+    <div><span>This run</span><strong class="now" id="finalScore">0</strong></div>
+    <div><span>Best</span><strong class="best" id="bestScore">0</strong></div>
   </div>
+  <p class="fresh" id="freshLine"></p>
+  <button class="btn" id="againBtn" type="button">Fly again</button>
+  <p class="keyline"><span>or press <kbd>Space</kbd></span></p>
+</div>
 
-  <div class="frame">
-    <div class="screen">
-      <canvas id="stage" width="400" height="640" tabindex="0"
-              aria-label="Vesper Finch game. Press space or click to flap."></canvas>
-      <div class="glass"></div>
-
-      <div class="panel" id="startPanel">
-        <p class="kicker">One button · endless</p>
-        <h2>Thread the canyon</h2>
-        <p>Tap, click, or press <kbd>Space</kbd> to beat your wings. Every gap you clear is a point. Touch stone or sand and the run ends.</p>
-        <button class="btn" id="startBtn" type="button">Begin the run</button>
-      </div>
-
-      <div class="panel" id="overPanel" hidden>
-        <p class="kicker">The run ends</p>
-        <h2 id="overTitle">Grounded</h2>
-        <div class="tally">
-          <div><span>This run</span><strong class="now" id="finalScore">0</strong></div>
-          <div><span>Best</span><strong class="best" id="bestScore">0</strong></div>
-        </div>
-        <p class="fresh" id="freshLine"></p>
-        <button class="btn" id="againBtn" type="button">Fly again</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="strip">
-    <span><kbd>Space</kbd> / <kbd>↑</kbd> / click to flap</span>
-    <span class="dot">·</span>
-    <span><kbd>P</kbd> pause</span>
-    <span class="dot">·</span>
-    <button class="mute" id="muteBtn" type="button">Sound: on</button>
-  </div>
+<div class="panel" id="pausePanel" hidden>
+  <p class="kicker">Holding position</p>
+  <h2>Paused</h2>
+  <button class="btn" id="resumeBtn" type="button">Resume run</button>
+  <p class="keyline"><span>or press <kbd>P</kbd></span></p>
 </div>
 
 <script>
 (() => {
   "use strict";
 
-  const W = 400, H = 640, GROUND = 96;
-  const SKY = H - GROUND;
+  /* ---------------- world metrics ----------------
+     Height is fixed at 640 logical units and the width follows the viewport
+     aspect, so the canvas fills any screen without letterboxing or distortion:
+     a wider window simply shows more canyon ahead. */
+  const H = 640, GROUND = 96, SKY = H - GROUND;
+  let W = 400;
 
   const cvs = document.getElementById("stage");
   const ctx = cvs.getContext("2d");
 
   const startPanel = document.getElementById("startPanel");
   const overPanel  = document.getElementById("overPanel");
+  const pausePanel = document.getElementById("pausePanel");
   const startBtn   = document.getElementById("startBtn");
   const againBtn   = document.getElementById("againBtn");
-  const muteBtn    = document.getElementById("muteBtn");
+  const resumeBtn  = document.getElementById("resumeBtn");
+  const musicBtn   = document.getElementById("musicBtn");
+  const sfxBtn     = document.getElementById("sfxBtn");
+  const pauseBtn   = document.getElementById("pauseBtn");
+  const fullBtn    = document.getElementById("fullBtn");
   const finalEl    = document.getElementById("finalScore");
   const bestEl     = document.getElementById("bestScore");
   const freshEl    = document.getElementById("freshLine");
@@ -343,45 +344,213 @@
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------------- persistence ---------------- */
-  const KEY = "vesper-finch.best";
-  function loadBest() {
-    try { return parseInt(localStorage.getItem(KEY) || "0", 10) || 0; }
-    catch (e) { return 0; }
-  }
-  function saveBest(v) {
-    try { localStorage.setItem(KEY, String(v)); } catch (e) { /* private mode */ }
-  }
-  let best = loadBest();
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem("vesper-finch." + key); return v === null ? fallback : v; }
+      catch (e) { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem("vesper-finch." + key, String(value)); } catch (e) { /* private mode */ }
+    }
+  };
+  let best = parseInt(store.get("best", "0"), 10) || 0;
 
-  /* ---------------- audio ---------------- */
-  let audioOn = true, actx = null;
-  function tone(freq, dur, type, gain, slideTo) {
-    if (!audioOn) return;
+  /* ---------------- audio ----------------
+     One context shared by the effects and the score. Browsers only allow it to
+     start from a gesture, so nothing sounds until the first flap. */
+  let actx = null;
+  let sfxOn   = store.get("sfx", "on") === "on";
+  let musicOn = store.get("music", "on") === "on";
+
+  function audio() {
     try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!actx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        actx = new AC();
+      }
       if (actx.state === "suspended") actx.resume();
-      const t = actx.currentTime;
-      const osc = actx.createOscillator();
-      const amp = actx.createGain();
+      return actx;
+    } catch (e) { return null; }
+  }
+
+  function blip(freq, dur, type, gain, slideTo) {
+    if (!sfxOn) return;
+    const c = audio(); if (!c) return;
+    try {
+      const t = c.currentTime;
+      const osc = c.createOscillator(), amp = c.createGain();
       osc.type = type;
       osc.frequency.setValueAtTime(freq, t);
       if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
       amp.gain.setValueAtTime(0.0001, t);
       amp.gain.exponentialRampToValueAtTime(gain, t + 0.012);
       amp.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      osc.connect(amp).connect(actx.destination);
+      osc.connect(amp).connect(c.destination);
       osc.start(t);
       osc.stop(t + dur + 0.02);
     } catch (e) { /* audio unavailable */ }
   }
-  const sfxFlap  = () => tone(430, 0.09, "triangle", 0.10, 640);
-  const sfxScore = () => tone(880, 0.13, "sine", 0.09, 1320);
-  const sfxHit   = () => tone(190, 0.26, "sawtooth", 0.12, 60);
+  const sfxFlap  = () => blip(430, 0.09, "triangle", 0.10, 640);
+  const sfxScore = () => blip(880, 0.13, "sine", 0.09, 1320);
+  const sfxHit   = () => blip(190, 0.26, "sawtooth", 0.12, 60);
 
-  muteBtn.addEventListener("click", () => {
-    audioOn = !audioOn;
-    muteBtn.textContent = "Sound: " + (audioOn ? "on" : "off");
-  });
+  /* ---------------- score (the music) ----------------
+     A four-chord loop in A minor, scheduled a beat ahead so timing doesn't
+     depend on the animation frame. A pad carries the harmony under a slow
+     filter sweep; a pentatonic pluck drifts over it, thickening as the run
+     gets longer. Nothing is sampled — it is all synthesised here. */
+  const music = (() => {
+    const BPM = 74;
+    const STEP = 60 / BPM / 2;          // an eighth note
+    const AHEAD = 0.35, TICK = 45;
+    const LOOP = 32;                    // eighths in the four-bar loop
+
+    // A minor – F – C – G, voiced low and open
+    const CHORDS = [
+      [45, 52, 57, 60],
+      [41, 48, 53, 57],
+      [48, 55, 60, 64],
+      [43, 50, 55, 59]
+    ];
+    const PENT = [69, 72, 74, 76, 79, 81];
+    const MEL_ON = [0, 3, 6, 8, 11, 14, 16, 19, 22, 24, 27, 30];
+
+    const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+    let out = null, padFilter = null, delay = null, noise = null;
+    let timer = 0, step = 0, nextTime = 0, running = false, level = 0.95;
+
+    function build(c) {
+      out = c.createGain();
+      out.gain.value = 0;
+      out.connect(c.destination);
+
+      padFilter = c.createBiquadFilter();
+      padFilter.type = "lowpass";
+      padFilter.frequency.value = 880;
+      padFilter.Q.value = 0.7;
+      padFilter.connect(out);
+
+      // slow breathing sweep across the pad
+      const lfo = c.createOscillator(), lfoAmt = c.createGain();
+      lfo.frequency.value = 0.045;
+      lfoAmt.gain.value = 380;
+      lfo.connect(lfoAmt).connect(padFilter.frequency);
+      lfo.start();
+
+      delay = c.createDelay(1);
+      delay.delayTime.value = 0.34;
+      const fb = c.createGain(), wet = c.createGain();
+      fb.gain.value = 0.3;
+      wet.gain.value = 0.42;
+      delay.connect(fb).connect(delay);
+      delay.connect(wet).connect(out);
+
+      noise = c.createBuffer(1, c.sampleRate, c.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+
+    function pad(c, t, notes, dur) {
+      for (const n of notes) {
+        const f = mtof(n);
+        for (const [type, detune, peak] of [["sawtooth", -6, 0.052], ["triangle", 7, 0.074]]) {
+          const o = c.createOscillator(), g = c.createGain();
+          o.type = type;
+          o.frequency.value = f;
+          o.detune.value = detune;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(peak, t + 1.3);
+          g.gain.setValueAtTime(peak, t + dur * 0.7);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 1.3);
+          o.connect(g).connect(padFilter);
+          o.start(t);
+          o.stop(t + dur + 1.4);
+        }
+      }
+    }
+
+    function pluck(c, t, midi, peak) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "triangle";
+      o.frequency.value = mtof(midi);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.05);
+      o.connect(g);
+      g.connect(out);
+      g.connect(delay);
+      o.start(t);
+      o.stop(t + 1.1);
+    }
+
+    function shaker(c, t, peak) {
+      const s = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+      s.buffer = noise;
+      bp.type = "bandpass";
+      bp.frequency.value = 5400;
+      bp.Q.value = 1.2;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+      s.connect(bp).connect(g).connect(out);
+      s.start(t, Math.random() * 0.4);
+      s.stop(t + 0.11);
+    }
+
+    function schedule() {
+      const c = actx;
+      if (!c || !running) return;
+      const lift = intensity();
+      while (nextTime < c.currentTime + AHEAD) {
+        if (step % 8 === 0) pad(c, nextTime, CHORDS[(step / 8) | 0], STEP * 8);
+        if (step % 2 === 1) shaker(c, nextTime, 0.014 + lift * 0.010);
+        if (MEL_ON.includes(step) && Math.random() < 0.14 + lift * 0.3) {
+          pluck(c, nextTime, PENT[(Math.random() * PENT.length) | 0], 0.075);
+        }
+        nextTime += STEP;
+        step = (step + 1) % LOOP;
+      }
+    }
+
+    // the canyon gets busier as the run goes on
+    function intensity() { return Math.min(1, score / 22); }
+
+    function fade(to, seconds) {
+      if (!out || !actx) return;
+      const t = actx.currentTime;
+      out.gain.cancelScheduledValues(t);
+      out.gain.setValueAtTime(Math.max(out.gain.value, 0.0001), t);
+      out.gain.linearRampToValueAtTime(to, t + seconds);
+    }
+
+    return {
+      start() {
+        if (!musicOn) return;
+        const c = audio(); if (!c) return;
+        try {
+          if (!out) build(c);
+          if (!running) {
+            running = true;
+            nextTime = c.currentTime + 0.08;
+            timer = setInterval(schedule, TICK);
+          }
+          fade(level, 2.2);
+        } catch (e) { /* audio unavailable */ }
+      },
+      stop() {
+        if (!running) return;
+        fade(0, 0.5);
+        running = false;
+        clearInterval(timer);
+        timer = 0;
+      },
+      duck(amount) { if (running) fade(level * amount, 0.35); },
+      lift() { if (running) fade(level, 1.4); },
+      get running() { return running; }
+    };
+  })();
 
   /* ---------------- world ---------------- */
   const STATE = { READY: 0, PLAY: 1, DYING: 2, OVER: 3 };
@@ -398,43 +567,10 @@
 
   const GRAV = 1750, FLAP = -470, VMAX = 700;
   const SPIRE_W = 68, SPACING = 214;
+  const OPENING = 470;                  // clear runway before the first spire
 
-  function speedNow()   { return 158 + Math.min(score, 40) * 1.6; }
-  function gapNow()     { return Math.max(150, 176 - Math.max(0, score - 4) * 1.8); }
-
-  // starfield
-  const stars = Array.from({ length: 46 }, () => ({
-    x: Math.random() * W,
-    y: Math.random() * SKY * 0.62,
-    r: Math.random() * 1.2 + 0.35,
-    p: Math.random() * Math.PI * 2
-  }));
-
-  // distant mesa silhouette — one repeating tile
-  const MESA_W = 400;
-  const mesa = (() => {
-    const pts = [];
-    let x = 0;
-    while (x < MESA_W) {
-      const w = 46 + Math.random() * 70;
-      const h = 34 + Math.random() * 62;
-      pts.push({ x, w, h });
-      x += w;
-    }
-    return pts;
-  })();
-
-  // foreground dune bumps
-  const dunes = Array.from({ length: 9 }, (_, i) => ({
-    x: i * 62, w: 52 + Math.random() * 46, h: 12 + Math.random() * 16
-  }));
-
-  function reset() {
-    bird.y = SKY * 0.45; bird.vy = 0; bird.rot = 0; bird.wing = 0;
-    spires = []; puffs = []; score = 0; shake = 0; deadFor = 0;
-    spawnSpire(W + 175);
-    spawnSpire(W + 175 + SPACING);
-  }
+  function speedNow() { return 158 + Math.min(score, 40) * 1.6; }
+  function gapNow()   { return Math.max(150, 176 - Math.max(0, score - 4) * 1.8); }
 
   // A flap lifts the finch 63 px over a 0.54 s cycle, so it climbs ~117 px/s at
   // best. Consecutive gap centres must stay inside that budget or the run turns
@@ -443,6 +579,39 @@
   // room to be imperfect.
   const CLIMB = 117;
   function swingNow() { return 0.7 * CLIMB * (SPACING / speedNow()); }
+
+  let stars = [];
+  const MESA_W = 400, DUNE_W = 560;
+  let mesa = [], dunes = [];
+
+  function buildScenery() {
+    stars = Array.from({ length: Math.max(30, Math.round(W * 0.11)) }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * SKY * 0.62,
+      r: Math.random() * 1.2 + 0.35,
+      p: Math.random() * Math.PI * 2
+    }));
+
+    mesa = [];
+    for (let x = 0; x < MESA_W; ) {
+      const w = 46 + Math.random() * 70;
+      mesa.push({ x, w, h: 34 + Math.random() * 62 });
+      x += w;
+    }
+
+    dunes = Array.from({ length: 9 }, (_, i) => ({
+      x: i * (DUNE_W / 9),
+      w: 52 + Math.random() * 46,
+      h: 12 + Math.random() * 16
+    }));
+  }
+
+  function reset() {
+    bird.y = SKY * 0.45; bird.vy = 0; bird.rot = 0; bird.wing = 0;
+    spires = []; puffs = []; score = 0; shake = 0; deadFor = 0;
+    spawnSpire(bird.x + OPENING);
+    spawnSpire(bird.x + OPENING + SPACING);
+  }
 
   function spawnSpire(x) {
     const gap = gapNow();
@@ -472,12 +641,7 @@
   }
 
   function flap() {
-    if (paused) return;
-    if (state === STATE.READY) {
-      startPanel.hidden = true;
-      state = STATE.PLAY;
-    }
-    if (state !== STATE.PLAY) return;
+    if (paused || state !== STATE.PLAY) return;
     bird.vy = FLAP;
     bird.wing = 0;
     sfxFlap();
@@ -492,19 +656,28 @@
     }
   }
 
+  function beginRun() {
+    if (state !== STATE.READY) return;
+    startPanel.hidden = true;
+    state = STATE.PLAY;
+    music.start();
+    flap();
+  }
+
   function die() {
     if (state !== STATE.PLAY) return;
     state = STATE.DYING;
     deadFor = 0;
     shake = reduceMotion ? 0 : 13;
     sfxHit();
+    music.duck(0.35);
     bird.vy = Math.min(bird.vy, -160);
   }
 
   function finish() {
     state = STATE.OVER;
     const fresh = score > best;
-    if (fresh) { best = score; saveBest(best); }
+    if (fresh) { best = score; store.set("best", best); }
     finalEl.textContent = score;
     bestEl.textContent = best;
     freshEl.textContent = fresh && score > 0 ? "New personal best" : "";
@@ -514,14 +687,25 @@
       score < 15  ? "Good line" :
       score < 30  ? "Sharp flying" : "Canyon master";
     overPanel.hidden = false;
-    againBtn.focus();
+    againBtn.focus({ preventScroll: true });
   }
 
   function restart() {
     overPanel.hidden = true;
     reset();
     state = STATE.PLAY;
-    cvs.focus();
+    music.start();
+    music.lift();
+  }
+
+  function setPaused(next) {
+    if (state !== STATE.PLAY && state !== STATE.DYING) return;
+    paused = next;
+    pausePanel.hidden = !next;
+    pauseBtn.classList.toggle("playing", next);
+    pauseBtn.title = next ? "Resume" : "Pause";
+    pauseBtn.setAttribute("aria-label", next ? "Resume" : "Pause");
+    if (next) music.duck(0.3); else { music.lift(); last = performance.now(); }
   }
 
   /* ---------------- physics ---------------- */
@@ -533,7 +717,6 @@
       scroll += 62 * dt;
       return;
     }
-
     if (state === STATE.OVER) return;
 
     const sp = speedNow();
@@ -556,15 +739,12 @@
       if (spires.length && spires[0].x < -SPIRE_W - 20) spires.shift();
 
       for (const s of spires) {
-        if (!s.scored && s.x + SPIRE_W < bird.x) {
-          s.scored = true; score++; sfxScore();
-        }
+        if (!s.scored && s.x + SPIRE_W < bird.x) { s.scored = true; score++; sfxScore(); }
         if (hits(s)) { die(); break; }
       }
 
       if (bird.y + bird.r >= SKY) { bird.y = SKY - bird.r; die(); }
     } else {
-      // dying: keep falling, stop at the sand
       deadFor += dt;
       if (bird.y + bird.r >= SKY) { bird.y = SKY - bird.r; bird.vy = 0; }
       if (deadFor > 0.65) finish();
@@ -584,8 +764,7 @@
 
   function hits(s) {
     const bx = bird.x, by = bird.y, r = bird.r - 1.5;
-    const inX = bx + r > s.x && bx - r < s.x + SPIRE_W;
-    if (!inX) return false;
+    if (!(bx + r > s.x && bx - r < s.x + SPIRE_W)) return false;
     return circleRect(bx, by, r, s.x, -200, SPIRE_W, s.top + 200) ||
            circleRect(bx, by, r, s.x, s.top + s.gap, SPIRE_W, SKY - (s.top + s.gap));
   }
@@ -607,18 +786,17 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, SKY);
 
-    // moon
+    const mx = W - 92;
     ctx.save();
     ctx.globalAlpha = 0.9;
     ctx.fillStyle = "#F6E7C8";
-    ctx.beginPath(); ctx.arc(312, 84, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx, 84, 22, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = "rgba(49,33,92,0.55)";
-    ctx.beginPath(); ctx.arc(318, 76, 6, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(304, 94, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx + 6, 76, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx - 8, 94, 4, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    // stars
     const t = performance.now() / 1000;
     for (const s of stars) {
       const tw = reduceMotion ? 0.6 : 0.45 + Math.sin(t * 1.7 + s.p) * 0.32;
@@ -631,9 +809,10 @@
 
   function drawMesas() {
     const off = (scroll * 0.22) % MESA_W;
+    const tiles = Math.ceil(W / MESA_W) + 1;
     ctx.fillStyle = "#4A2C52";
-    for (let tile = -1; tile <= 1; tile++) {
-      const base = tile * MESA_W - off;
+    for (let tile = 0; tile <= tiles; tile++) {
+      const base = tile * MESA_W - off - MESA_W;
       for (const m of mesa) {
         const x = base + m.x;
         if (x > W + 60 || x + m.w < -60) continue;
@@ -660,11 +839,10 @@
     body.addColorStop(0.78, "#8A4A52");
     body.addColorStop(1.00, "#54293A");
 
-    const drawColumn = (top, height) => {
+    const column = (top, height) => {
       if (height <= 0) return;
       ctx.fillStyle = body;
       ctx.fillRect(x, top, SPIRE_W, height);
-      // strata
       ctx.strokeStyle = "rgba(30,14,28,0.22)";
       ctx.lineWidth = 1;
       for (let y = top + 16; y < top + height; y += 26) {
@@ -675,7 +853,7 @@
       }
     };
 
-    const drawCap = (y, dir) => {
+    const cap = (y, dir) => {
       const capH = 20, over = 7;
       const cg = ctx.createLinearGradient(x - over, 0, x + SPIRE_W + over, 0);
       cg.addColorStop(0.00, "#6B3644");
@@ -690,10 +868,10 @@
       ctx.fillRect(x - over, dir > 0 ? y - 3 : y + capH - 3, SPIRE_W + over * 2, 3);
     };
 
-    drawColumn(-200, gapTop + 200 - 20);
-    drawCap(gapTop, 1);
-    drawColumn(gapBot + 20, SKY - gapBot - 20);
-    drawCap(gapBot, -1);
+    column(-200, gapTop + 200 - 20);
+    cap(gapTop, 1);
+    column(gapBot + 20, SKY - gapBot - 20);
+    cap(gapBot, -1);
   }
 
   function drawGround() {
@@ -704,12 +882,12 @@
     ctx.fillStyle = g;
     ctx.fillRect(0, SKY, W, GROUND);
 
-    // dune ridge riding just above the sand line
-    const off = (scroll * 1.05) % 560;
+    const off = (scroll * 1.05) % DUNE_W;
+    const tiles = Math.ceil(W / DUNE_W) + 1;
     ctx.fillStyle = "#D79B69";
-    for (let tile = -1; tile <= 1; tile++) {
+    for (let tile = 0; tile <= tiles; tile++) {
       for (const d of dunes) {
-        const x = tile * 560 + d.x * 1.0 - off;
+        const x = tile * DUNE_W + d.x - off - DUNE_W;
         if (x > W + 80 || x + d.w < -80) continue;
         ctx.beginPath();
         ctx.moveTo(x, SKY + 2);
@@ -722,7 +900,6 @@
     ctx.fillStyle = "rgba(50,24,34,0.35)";
     ctx.fillRect(0, SKY + 14, W, 2);
 
-    // pebbles
     ctx.fillStyle = "rgba(50,24,34,0.30)";
     const po = (scroll * 1.05) % 40;
     for (let x = -po; x < W + 40; x += 40) {
@@ -736,50 +913,39 @@
       const k = 1 - p.age / p.life;
       ctx.globalAlpha = k * 0.4;
       ctx.fillStyle = "#EBDFFA";
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + (1 - k)), 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (2 - k), 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
 
   function drawFinch() {
     ctx.save();
+    // on the start screen the finch sits behind the wordmark: keep it ambient
+    if (state === STATE.READY) ctx.globalAlpha = 0.55;
     ctx.translate(bird.x, bird.y);
     ctx.rotate(bird.rot);
 
-    // tail
     ctx.fillStyle = "#12907F";
     ctx.beginPath();
-    ctx.moveTo(-13, -2);
-    ctx.lineTo(-27, -9);
-    ctx.lineTo(-24, 0);
-    ctx.lineTo(-27, 8);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(-13, -2); ctx.lineTo(-27, -9); ctx.lineTo(-24, 0); ctx.lineTo(-27, 8);
+    ctx.closePath(); ctx.fill();
 
-    // body
     const bg = ctx.createLinearGradient(0, -14, 0, 14);
     bg.addColorStop(0, "#5FF0DC");
     bg.addColorStop(0.55, "#2FDDC4");
     bg.addColorStop(1, "#149C93");
     ctx.fillStyle = bg;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 17, 13.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, 17, 13.5, 0, 0, Math.PI * 2); ctx.fill();
 
-    // pale breast
     ctx.fillStyle = "rgba(233,255,250,0.55)";
-    ctx.beginPath();
-    ctx.ellipse(4, 5, 9, 6.5, -0.18, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(4, 5, 9, 6.5, -0.18, 0, Math.PI * 2); ctx.fill();
 
-    // crest
     ctx.strokeStyle = "#5FF0DC";
     ctx.lineWidth = 2.4;
     ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(1, -12); ctx.lineTo(-4, -19); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(5, -11); ctx.lineTo(2, -18); ctx.stroke();
 
-    // wing
     const beat = Math.sin(bird.wing) * 0.85;
     ctx.save();
     ctx.translate(-2, -1);
@@ -788,42 +954,27 @@
     wg.addColorStop(0, "#1FC7B4");
     wg.addColorStop(1, "#0E7C77");
     ctx.fillStyle = wg;
-    ctx.beginPath();
-    ctx.ellipse(-3, 3 + beat * 3, 12, 7.5, 0.32, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.ellipse(-3, 3 + beat * 3, 12, 7.5, 0.32, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(6,52,52,0.35)";
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-12, 5 + beat * 3); ctx.lineTo(4, 6 + beat * 3);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-12, 5 + beat * 3); ctx.lineTo(4, 6 + beat * 3); ctx.stroke();
     ctx.restore();
 
-    // beak
     ctx.fillStyle = "#F2B33D";
-    ctx.beginPath();
-    ctx.moveTo(15, -3);
-    ctx.lineTo(27, 1);
-    ctx.lineTo(15, 5);
-    ctx.closePath();
-    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(15, -3); ctx.lineTo(27, 1); ctx.lineTo(15, 5); ctx.closePath(); ctx.fill();
     ctx.fillStyle = "#D2911F";
-    ctx.beginPath();
-    ctx.moveTo(15, 1.5); ctx.lineTo(27, 1); ctx.lineTo(15, 5); ctx.closePath();
-    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(15, 1.5); ctx.lineTo(27, 1); ctx.lineTo(15, 5); ctx.closePath(); ctx.fill();
 
-    // eye
     ctx.fillStyle = "#0B2B33";
     ctx.beginPath(); ctx.arc(8.5, -4.5, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#F7FFFD";
     ctx.beginPath(); ctx.arc(8.5, -4.5, 4.1, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#12262E";
-    const look = state === STATE.DYING ? 0 : 1.1;
-    ctx.beginPath(); ctx.arc(9.4 + look * 0.3, -4.2, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(state === STATE.DYING ? 9.4 : 9.7, -4.2, 2.2, 0, Math.PI * 2); ctx.fill();
     if (state !== STATE.DYING) {
       ctx.fillStyle = "rgba(255,255,255,0.9)";
       ctx.beginPath(); ctx.arc(10.6, -5.6, 0.9, 0, Math.PI * 2); ctx.fill();
     }
-
     ctx.restore();
   }
 
@@ -846,23 +997,9 @@
     ctx.restore();
   }
 
-  function drawPaused() {
-    ctx.fillStyle = "rgba(13,8,26,0.66)";
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = "#F3EEF8";
-    ctx.font = '600 20px "IBM Plex Mono", monospace';
-    ctx.textAlign = "center";
-    ctx.fillText("PAUSED", W / 2, SKY / 2);
-    ctx.font = '400 11px "IBM Plex Mono", monospace';
-    ctx.fillStyle = "#B9A8CE";
-    ctx.fillText("press P to resume", W / 2, SKY / 2 + 24);
-  }
-
   function render() {
     ctx.save();
-    if (shake > 0) {
-      ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-    }
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
     drawSky();
     drawMesas();
     for (const s of spires) drawSpire(s);
@@ -871,7 +1008,6 @@
     drawFinch();
     ctx.restore();
     drawScore();
-    if (paused) drawPaused();
   }
 
   /* ---------------- loop ---------------- */
@@ -892,47 +1028,107 @@
 
   /* ---------------- sizing ---------------- */
   function resize() {
+    const vw = cvs.clientWidth, vh = cvs.clientHeight;
+    if (!vw || !vh) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const rect = cvs.getBoundingClientRect();
-    cvs.width  = Math.round(rect.width * dpr);
-    cvs.height = Math.round(rect.height * dpr);
-    ctx.setTransform((rect.width / W) * dpr, 0, 0, (rect.height / H) * dpr, 0, 0);
-    ctx.imageSmoothingEnabled = true;
+    const prevW = W;
+
+    W = Math.max(300, Math.min(1600, Math.round(H * (vw / vh))));
+    cvs.width = Math.round(vw * dpr);
+    cvs.height = Math.round(vh * dpr);
+    const s = (vh / H) * dpr;
+    ctx.setTransform(s, 0, 0, s, 0, 0);
+
+    bird.x = Math.round(Math.max(86, Math.min(190, W * 0.26)));
+    if (W !== prevW || stars.length === 0) buildScenery();
   }
   window.addEventListener("resize", resize);
+  window.addEventListener("orientationchange", resize);
   if (window.ResizeObserver) new ResizeObserver(resize).observe(cvs);
 
   /* ---------------- input ---------------- */
   function press(e) {
-    if (e) e.preventDefault();
-    if (state === STATE.OVER) { restart(); return; }
-    flap();
+    if (e && e.cancelable) e.preventDefault();
+    if (paused) return;
+    if (state === STATE.READY) beginRun();
+    else if (state === STATE.PLAY) flap();
+    else if (state === STATE.OVER) restart();
   }
 
   cvs.addEventListener("pointerdown", press);
-  startBtn.addEventListener("click", (e) => { e.stopPropagation(); startPanel.hidden = true; state = STATE.PLAY; flap(); cvs.focus(); });
-  againBtn.addEventListener("click", (e) => { e.stopPropagation(); restart(); });
+  startPanel.addEventListener("pointerdown", (e) => { e.preventDefault(); beginRun(); });
+  startBtn.addEventListener("click", beginRun);
+  againBtn.addEventListener("click", restart);
+  resumeBtn.addEventListener("click", () => setPaused(false));
+
+  const CONTROLS = [musicBtn, sfxBtn, pauseBtn, fullBtn];
 
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") {
+      // let the keyboard activate a focused control instead of flapping
+      if (CONTROLS.includes(document.activeElement)) return;
       if (document.activeElement === startBtn || document.activeElement === againBtn ||
-          document.activeElement === muteBtn) return;
-      press(e);
-    } else if (e.code === "KeyP") {
-      if (state === STATE.PLAY || state === STATE.DYING) {
-        paused = !paused;
-        last = performance.now();
+          document.activeElement === resumeBtn) {
+        if (e.code === "Space") return;
       }
+      press(e);
+    } else if (e.code === "KeyP" || e.code === "Escape") {
+      if (state === STATE.PLAY || state === STATE.DYING) setPaused(!paused);
+    } else if (e.code === "KeyM") {
+      toggleMusic();
     }
   });
 
+  /* ---------------- controls ---------------- */
+  function paintToggle(btn, on, label) {
+    btn.classList.toggle("off", !on);
+    btn.setAttribute("aria-label", `${label} ${on ? "on" : "off"}`);
+    btn.title = `${label}: ${on ? "on" : "off"}`;
+  }
+
+  function toggleMusic() {
+    musicOn = !musicOn;
+    store.set("music", musicOn ? "on" : "off");
+    paintToggle(musicBtn, musicOn, "Music");
+    if (musicOn) { if (state !== STATE.READY) music.start(); }
+    else music.stop();
+  }
+
+  musicBtn.addEventListener("click", (e) => { toggleMusic(); if (e.detail > 0) musicBtn.blur(); });
+  sfxBtn.addEventListener("click", (e) => {
+    sfxOn = !sfxOn;
+    store.set("sfx", sfxOn ? "on" : "off");
+    paintToggle(sfxBtn, sfxOn, "Sound effects");
+    if (e.detail > 0) sfxBtn.blur();
+  });
+  pauseBtn.addEventListener("click", (e) => { setPaused(!paused); if (e.detail > 0) pauseBtn.blur(); });
+
+  if (document.fullscreenEnabled) {
+    fullBtn.hidden = false;
+    fullBtn.addEventListener("click", (e) => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(() => {});
+      if (e.detail > 0) fullBtn.blur();
+    });
+    document.addEventListener("fullscreenchange", () => {
+      const on = !!document.fullscreenElement;
+      fullBtn.title = on ? "Exit fullscreen" : "Fullscreen";
+      fullBtn.setAttribute("aria-label", fullBtn.title);
+    });
+  }
+
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden && state === STATE.PLAY) paused = true;
+    if (document.hidden) {
+      if (state === STATE.PLAY || state === STATE.DYING) setPaused(true);
+      if (actx && actx.state === "running") actx.suspend();
+    }
     last = performance.now();
   });
 
-  reset();
+  paintToggle(musicBtn, musicOn, "Music");
+  paintToggle(sfxBtn, sfxOn, "Sound effects");
   resize();
+  reset();
   requestAnimationFrame(frame);
 })();
 </script>
