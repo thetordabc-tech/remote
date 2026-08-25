@@ -45,6 +45,13 @@
   }
   #minimap { width: 100%; height: 100%; display:block; }
 
+  #muteBtn {
+    position: absolute; top: 10px; left: 10px; width: 44px; height: 44px;
+    background: rgba(0,0,0,0.55); border: 2px solid #444; border-radius: 4px;
+    color: #eee; font-size: 20px; display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+  }
+
   #msg {
     position: absolute; top: 14%; left: 50%; transform: translateX(-50%);
     color: #fff; font-size: 18px; text-shadow: 2px 2px 0 #000;
@@ -107,6 +114,7 @@
 
 <div id="hud">
   <div id="crosshair"></div>
+  <button id="muteBtn">&#x1F50A;</button>
   <div id="minimapWrap"><canvas id="minimap" width="110" height="110"></canvas></div>
   <div id="msg"></div>
   <div id="statusBar">
@@ -171,10 +179,73 @@ function mapAt(x, y) {
   return MAP[iy][ix];
 }
 
-const WALL_COLORS = {
-  1: [150, 40, 40],
-  2: [90, 90, 100],
-};
+/* ============================ WALL TEXTURES (procedurally generated) ============================ */
+const TEX_SIZE = 64;
+function makeTexCanvas() {
+  const c = document.createElement('canvas');
+  c.width = TEX_SIZE; c.height = TEX_SIZE;
+  return c;
+}
+function addNoise(g, amtR, amtG, amtB) {
+  const id = g.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
+  for (let p = 0; p < id.data.length; p += 4) {
+    const n = (Math.random() - 0.5);
+    id.data[p]     = Math.max(0, Math.min(255, id.data[p]     + n * amtR));
+    id.data[p + 1] = Math.max(0, Math.min(255, id.data[p + 1] + n * amtG));
+    id.data[p + 2] = Math.max(0, Math.min(255, id.data[p + 2] + n * amtB));
+  }
+  g.putImageData(id, 0, 0);
+}
+function buildHellTexture() {
+  const c = makeTexCanvas(); const g = c.getContext('2d');
+  g.fillStyle = '#3a1010'; g.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  const rowH = 8;
+  for (let ry = 0; ry < TEX_SIZE; ry += rowH) {
+    const offset = (Math.floor(ry / rowH) % 2) * 8;
+    for (let rx = -8; rx < TEX_SIZE; rx += 16) {
+      const bx = rx + offset;
+      const shade = 0.7 + Math.random() * 0.4;
+      g.fillStyle = `rgb(${Math.floor(125 * shade)},${Math.floor(32 * shade)},${Math.floor(26 * shade)})`;
+      g.fillRect(bx + 1, ry + 1, 14, rowH - 2);
+    }
+  }
+  g.strokeStyle = 'rgba(8,0,0,0.65)'; g.lineWidth = 1;
+  for (let ry = 0; ry <= TEX_SIZE; ry += rowH) { g.beginPath(); g.moveTo(0, ry); g.lineTo(TEX_SIZE, ry); g.stroke(); }
+  g.strokeStyle = 'rgba(255,100,20,0.45)';
+  for (let i = 0; i < 5; i++) {
+    let x = Math.random() * TEX_SIZE, y = Math.random() * TEX_SIZE;
+    g.beginPath(); g.moveTo(x, y);
+    for (let s = 0; s < 4; s++) { x += (Math.random() - 0.5) * 14; y += (Math.random() - 0.5) * 14; g.lineTo(x, y); }
+    g.stroke();
+  }
+  addNoise(g, 20, 12, 8);
+  return c;
+}
+function buildTechTexture() {
+  const c = makeTexCanvas(); const g = c.getContext('2d');
+  g.fillStyle = '#6a6a72'; g.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+  g.strokeStyle = 'rgba(15,15,18,0.85)'; g.lineWidth = 2;
+  g.strokeRect(2, 2, TEX_SIZE - 4, TEX_SIZE - 4);
+  g.beginPath(); g.moveTo(TEX_SIZE / 2, 0); g.lineTo(TEX_SIZE / 2, TEX_SIZE); g.stroke();
+  g.beginPath(); g.moveTo(0, TEX_SIZE / 2); g.lineTo(TEX_SIZE, TEX_SIZE / 2); g.stroke();
+  g.fillStyle = '#2a2a2e';
+  const rivets = [[6,6],[TEX_SIZE-6,6],[6,TEX_SIZE-6],[TEX_SIZE-6,TEX_SIZE-6],
+                  [TEX_SIZE/2,6],[TEX_SIZE/2,TEX_SIZE-6],[6,TEX_SIZE/2],[TEX_SIZE-6,TEX_SIZE/2]];
+  for (const [rx, ry] of rivets) { g.beginPath(); g.arc(rx, ry, 1.6, 0, Math.PI * 2); g.fill(); }
+  g.save();
+  g.beginPath(); g.rect(0, TEX_SIZE * 0.42, TEX_SIZE, TEX_SIZE * 0.12); g.clip();
+  for (let sx = -TEX_SIZE; sx < TEX_SIZE * 2; sx += 10) {
+    g.fillStyle = (((sx / 10) | 0) % 2 === 0) ? '#dcbb1a' : '#161616';
+    g.beginPath();
+    g.moveTo(sx, TEX_SIZE); g.lineTo(sx + 10, TEX_SIZE); g.lineTo(sx + 18, 0); g.lineTo(sx + 8, 0);
+    g.closePath(); g.fill();
+  }
+  g.restore();
+  addNoise(g, 14, 14, 14);
+  return c;
+}
+const TEXTURES = { 1: buildHellTexture(), 2: buildTechTexture() };
+function textureFor(wallType) { return TEXTURES[wallType] || TEXTURES[1]; }
 
 /* ============================ ENEMIES ============================ */
 function makeEnemy(x, y) {
@@ -291,6 +362,215 @@ document.getElementById('gameCanvas').addEventListener('click', () => {
   document.getElementById('gameCanvas').requestPointerLock && document.getElementById('gameCanvas').requestPointerLock();
 });
 
+/* ============================ AUDIO: MUSIC + SFX ============================ */
+const AudioEngine = (() => {
+  let ctx = null, masterGain, musicGain, sfxGain, noiseBuffer, distortionCurve;
+  let musicPlaying = false, nextNoteTime = 0, step = 0, schedulerId = null, muted = false;
+  const bpm = 158;
+  const stepDur = 60 / bpm / 4; // 16th notes
+  const rootFreq = 41.20; // E1 - low, heavy, metal-riff register
+  const bassPattern  = [0,null,0,3, 0,null,0,5, 3,null,3,0, 5,3,0,null];
+  const kickPattern  = [1,0,0,0, 1,0,1,0, 1,0,0,0, 1,0,1,0];
+  const snarePattern = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,1];
+  const hatPattern   = [1,1,0,1, 1,1,0,1, 1,1,0,1, 1,1,0,1];
+
+  function makeDistortionCurve(amount) {
+    const n = 8192; const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = i * 2 / n - 1;
+      curve[i] = ((3 + amount) * x * 20 * Math.PI / 180) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
+  }
+
+  function init() {
+    if (ctx) return;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { return; }
+    masterGain = ctx.createGain(); masterGain.gain.value = muted ? 0 : 0.85; masterGain.connect(ctx.destination);
+    musicGain = ctx.createGain(); musicGain.gain.value = 0.32; musicGain.connect(masterGain);
+    sfxGain = ctx.createGain(); sfxGain.gain.value = 0.9; sfxGain.connect(masterGain);
+    distortionCurve = makeDistortionCurve(28);
+    const len = ctx.sampleRate * 1;
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function noteFreq(offset) { return rootFreq * Math.pow(2, offset / 12); }
+
+  function playBassNote(time, freq) {
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+    const dist = ctx.createWaveShaper(); dist.curve = distortionCurve; dist.oversample = '2x';
+    const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 900; filter.Q.value = 1;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(0.9, time + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + stepDur * 0.9);
+    osc.connect(dist); dist.connect(filter); filter.connect(g); g.connect(musicGain);
+    osc.start(time); osc.stop(time + stepDur);
+  }
+  function playKick(time) {
+    const osc = ctx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(1, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    osc.connect(g); g.connect(musicGain);
+    osc.start(time); osc.stop(time + 0.2);
+  }
+  function playSnare(time) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 1200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.7, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    src.connect(filter); filter.connect(g); g.connect(musicGain);
+    src.start(time); src.stop(time + 0.15);
+  }
+  function playHat(time) {
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 7000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.22, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    src.connect(filter); filter.connect(g); g.connect(musicGain);
+    src.start(time); src.stop(time + 0.05);
+  }
+  function scheduleStep(time, s) {
+    const b = bassPattern[s];
+    if (b !== null) playBassNote(time, noteFreq(b));
+    if (kickPattern[s]) playKick(time);
+    if (snarePattern[s]) playSnare(time);
+    if (hatPattern[s]) playHat(time);
+  }
+  function schedulerTick() {
+    while (nextNoteTime < ctx.currentTime + 0.12) {
+      scheduleStep(nextNoteTime, step);
+      nextNoteTime += stepDur;
+      step = (step + 1) % 16;
+    }
+  }
+  function startMusic() {
+    init(); resume();
+    if (!ctx || musicPlaying) return;
+    musicPlaying = true; step = 0; nextNoteTime = ctx.currentTime + 0.05;
+    schedulerId = setInterval(schedulerTick, 25);
+  }
+  function stopMusic() {
+    musicPlaying = false;
+    if (schedulerId) clearInterval(schedulerId);
+    schedulerId = null;
+  }
+  function setMuted(m) {
+    muted = m;
+    if (masterGain) masterGain.gain.value = m ? 0 : 0.85;
+  }
+
+  // ---- SFX ----
+  function gunshot() {
+    init(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuffer;
+    const filter = ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 1800; filter.Q.value = 0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(1, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    src.connect(filter); filter.connect(g); g.connect(sfxGain);
+    src.start(t); src.stop(t + 0.12);
+
+    const osc = ctx.createOscillator(); osc.type = 'square';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.08);
+    const g2 = ctx.createGain();
+    g2.gain.setValueAtTime(0.6, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.connect(g2); g2.connect(sfxGain);
+    osc.start(t); osc.stop(t + 0.1);
+  }
+  function growl(type) {
+    init(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    const baseFreq = type === 'death' ? 160 : type === 'pain' ? 220 : 130;
+    const dur = type === 'death' ? 0.8 : 0.25;
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(type === 'death' ? 40 : baseFreq * 0.6, t + dur);
+    const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(filter); filter.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + dur + 0.05);
+  }
+  function playerPain() {
+    init(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(140, t + 0.2);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 0.25);
+  }
+  function playerDeath() {
+    init(); if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator(); osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 1.1);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.6, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    osc.connect(g); g.connect(sfxGain);
+    osc.start(t); osc.stop(t + 1.2);
+  }
+  function fanfare() {
+    init(); if (!ctx) return;
+    const t = ctx.currentTime;
+    [0, 4, 7, 12].forEach((n, i) => {
+      const osc = ctx.createOscillator(); osc.type = 'square';
+      osc.frequency.value = 220 * Math.pow(2, n / 12);
+      const g = ctx.createGain();
+      const st = t + i * 0.12;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.linearRampToValueAtTime(0.35, st + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.3);
+      osc.connect(g); g.connect(sfxGain);
+      osc.start(st); osc.stop(st + 0.3);
+    });
+  }
+
+  return { init, resume, startMusic, stopMusic, setMuted, gunshot, growl, playerPain, playerDeath, fanfare };
+})();
+
+/* ============================ VOICELINES (Web Speech synthesis) ============================ */
+const Voice = (() => {
+  const enabled = 'speechSynthesis' in window;
+  let lastSpeak = 0;
+  function speak(text, minGapMs) {
+    if (!enabled || Muted.on) return;
+    const now = performance.now();
+    if (minGapMs && now - lastSpeak < minGapMs) return;
+    lastSpeak = now;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.pitch = 0.4; u.rate = 1.15; u.volume = 1;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  return { speak };
+})();
+const KILL_QUOTES = ['Get some!', 'Yeah!', 'Booyah!', 'Rip and tear!', "That's it!"];
+const Muted = { on: false };
+
 /* ============================ RENDER SETUP ============================ */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -318,7 +598,7 @@ function castRay(px, py, angle) {
   const sin = Math.sin(angle), cos = Math.cos(angle);
   let dist = 0;
   const step = 0.02;
-  let hitWall = 0, side = 0;
+  let hitWall = 0, side = 0, wallX = 0;
   let x = px, y = py;
   while (dist < MAX_DEPTH) {
     dist += step;
@@ -329,11 +609,14 @@ function castRay(px, py, angle) {
       hitWall = cell;
       const fracX = x - Math.floor(x);
       const fracY = y - Math.floor(y);
-      side = (Math.min(fracX, 1-fracX) < Math.min(fracY, 1-fracY)) ? 1 : 0;
+      const distX = Math.min(fracX, 1 - fracX);
+      const distY = Math.min(fracY, 1 - fracY);
+      side = (distX < distY) ? 1 : 0;
+      wallX = side === 1 ? fracY : fracX;
       break;
     }
   }
-  return { dist, hitWall, side, x, y };
+  return { dist, hitWall, side, wallX, x, y };
 }
 
 const zBuffer = new Float32Array(2048);
@@ -361,15 +644,19 @@ function render3D() {
     const correctedDist = r.dist * Math.cos(rayAngle - player.angle);
     zBuffer[i] = correctedDist;
     const wallH = Math.min(H * 3, (H / (correctedDist + 0.0001)) * 0.9);
-    const col = WALL_COLORS[r.hitWall] || [120,120,120];
     let shade = 1 - Math.min(correctedDist / 12, 0.85);
     if (r.side === 1) shade *= 0.7;
-    const cR = Math.floor(col[0] * shade);
-    const cG = Math.floor(col[1] * shade);
-    const cB = Math.floor(col[2] * shade);
-    ctx.fillStyle = `rgb(${cR},${cG},${cB})`;
     const x = Math.floor(i * colWidth);
-    ctx.fillRect(x, (H - wallH) / 2, Math.ceil(colWidth) + 1, wallH);
+    const cw = Math.ceil(colWidth) + 1;
+    const drawY = (H - wallH) / 2;
+    const tex = textureFor(r.hitWall);
+    const texX = Math.min(TEX_SIZE - 1, Math.max(0, Math.floor(r.wallX * TEX_SIZE)));
+    ctx.drawImage(tex, texX, 0, 1, TEX_SIZE, x, drawY, cw, wallH);
+    const dark = Math.max(0, Math.min(0.92, 1 - shade));
+    if (dark > 0.02) {
+      ctx.fillStyle = `rgba(0,0,0,${dark})`;
+      ctx.fillRect(x, drawY, cw, wallH);
+    }
   }
 }
 
@@ -534,6 +821,7 @@ function fireWeapon(dt) {
   lastShot = simTime;
   player.ammo--;
   muzzleFlash = 1;
+  AudioEngine.gunshot();
 
   // hitscan: find nearest enemy within a narrow cone in front of player, unobstructed
   let best = null, bestDist = Infinity;
@@ -559,6 +847,10 @@ function fireWeapon(dt) {
       best.deathTimer = 0;
       player.kills++;
       showMsg('DEMON SLAIN', 0.8);
+      AudioEngine.growl('death');
+      Voice.speak(KILL_QUOTES[Math.floor(Math.random() * KILL_QUOTES.length)], 3500);
+    } else {
+      AudioEngine.growl('pain');
     }
   }
 }
@@ -593,6 +885,7 @@ function updateEnemies(dt) {
   }
 }
 
+let lowHealthWarned = false;
 function applyDamage(dmg) {
   if (player.dead) return;
   let remaining = dmg;
@@ -603,9 +896,16 @@ function applyDamage(dmg) {
   }
   player.health -= remaining;
   damageFlash = 1;
+  AudioEngine.playerPain();
+  if (player.health <= 25 && player.health > 0 && !lowHealthWarned) {
+    lowHealthWarned = true;
+    Voice.speak("I'm not gonna make it!", 0);
+  }
   if (player.health <= 0) {
     player.health = 0;
     player.dead = true;
+    AudioEngine.playerDeath();
+    Voice.speak('Ugh...', 0);
     endGame(false);
   }
 }
@@ -619,6 +919,8 @@ function checkWin() {
 function endGame(won) {
   gameOver = true;
   gameRunning = false;
+  AudioEngine.stopMusic();
+  if (won) { AudioEngine.fanfare(); Voice.speak('Hell... cleared.', 0); }
   document.getElementById('endScreen').style.display = 'flex';
   document.getElementById('endTitle').textContent = won ? 'LEVEL COMPLETE' : 'YOU DIED';
   document.getElementById('endTitle').style.color = won ? '#7fe33d' : '#d33';
@@ -702,17 +1004,28 @@ function resetGame() {
     makeEnemy(3.5, 11.5), makeEnemy(9.5, 13.5), makeEnemy(16.5, 16.5), makeEnemy(6.5, 17.5),
   ];
   gameOver = false;
+  lowHealthWarned = false;
 }
 
 document.getElementById('startBtn').addEventListener('click', () => {
   document.getElementById('startScreen').style.display = 'none';
   gameRunning = true;
   requestFullscreenSafe();
+  AudioEngine.init();
+  AudioEngine.startMusic();
+  Voice.speak('Rip and tear!', 0);
 });
 document.getElementById('retryBtn').addEventListener('click', () => {
   resetGame();
   document.getElementById('endScreen').style.display = 'none';
   gameRunning = true;
+  AudioEngine.startMusic();
+});
+document.getElementById('muteBtn').addEventListener('click', () => {
+  Muted.on = !Muted.on;
+  AudioEngine.setMuted(Muted.on);
+  document.getElementById('muteBtn').textContent = Muted.on ? '\u{1F507}' : '\u{1F50A}';
+  if (Muted.on && 'speechSynthesis' in window) { try { window.speechSynthesis.cancel(); } catch(e) {} }
 });
 
 function requestFullscreenSafe() {
