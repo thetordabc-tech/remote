@@ -44,12 +44,15 @@
   }
   #fireBtn.active { background: rgba(255,90,40,0.55); }
 
-  #muteBtn {
-    position: absolute; top: 8px; left: 8px; width: 38px; height: 38px;
+  #muteBtn, #autoBtn {
+    position: absolute; left: 8px; width: 38px; height: 38px;
     background: rgba(0,0,0,0.5); border: 2px solid #5a3a22; border-radius: 3px;
-    color: #d8b48a; font-size: 17px; display: flex; align-items: center; justify-content: center;
-    pointer-events: auto; z-index: 4; padding: 0;
+    color: #d8b48a; display: flex; align-items: center; justify-content: center;
+    pointer-events: auto; z-index: 4; padding: 0; font-family: inherit;
   }
+  #muteBtn { top: 8px; font-size: 17px; }
+  #autoBtn { top: 52px; font-size: 9px; font-weight: bold; letter-spacing: 0.5px; }
+  #autoBtn.off { opacity: 0.4; }
 
   .overlay {
     position: fixed; inset: 0; z-index: 10;
@@ -84,6 +87,7 @@
 <canvas id="gameCanvas"></canvas>
 
 <button id="muteBtn">&#x1F50A;</button>
+<button id="autoBtn">AUTO</button>
 <div id="joyZoneL"><div class="stick-base" id="stickBaseL"><div class="stick-nub" id="stickNubL"></div></div></div>
 <div id="joyZoneR"><div class="stick-base" id="stickBaseR"><div class="stick-nub" id="stickNubR"></div></div></div>
 <div id="fireBtn">FIRE</div>
@@ -93,6 +97,8 @@
   <div class="sub">KNEE-DEEP IN THE BROWSER</div>
   <p class="keyline">LEFT STICK MOVE &nbsp;&middot;&nbsp; RIGHT STICK TURN &nbsp;&middot;&nbsp; FIRE</p>
   <p>Clear the installation of every demon. Grab shells, medikits and armor.</p>
+  <p>The view follows corners for you as you walk into them.<br>
+  Tap AUTO (or press T) to switch that off.</p>
   <p style="font-size:11px;color:#6a5a44">DESKTOP: WASD move &middot; mouse or arrows look &middot; SPACE fire</p>
   <button id="startBtn">START</button>
 </div>
@@ -1618,7 +1624,47 @@ function renderOverlays() {
    ===================================================================== */
 const MOVE_SPEED = 3.1, TURN_SPEED = 2.7;
 
+// --- corridor auto-steer: ease the view around bends as you walk into them ---
+const AUTO = { on: true, suspend: 0 };
+const AUTO_TRIGGER = 3.0;    // start easing in once a wall is this close ahead
+const AUTO_RATE = 3.4;       // max rad/s of assisted turning
+
 function walkable(x, y) { return mapAt(x, y) === 0; }
+
+// Free distance from (px,py) along `angle`, capped at maxDist.
+function rayClear(px, py, angle, maxDist) {
+  const ca = Math.cos(angle), sa = Math.sin(angle);
+  for (let d = 0.12; d < maxDist; d += 0.12) {
+    if (mapAt(px + ca * d, py + sa * d) > 0) return d;
+  }
+  return maxDist;
+}
+
+// Rotate towards the most open heading, but only when the way ahead is
+// closing down — in open rooms and straight corridors this does nothing.
+function autoSteer(dt, fwd) {
+  if (!AUTO.on || player.dead) return;
+  if (AUTO.suspend > 0) { AUTO.suspend -= dt; return; }
+  if (fwd <= 0.15) return;
+
+  const ahead = rayClear(player.x, player.y, player.angle, AUTO_TRIGGER + 0.5);
+  if (ahead >= AUTO_TRIGGER) return;
+
+  const SAMPLES = 13, SPREAD = 1.05;          // scan +-60 degrees
+  let bestScore = -Infinity, bestOff = 0;
+  for (let i = 0; i < SAMPLES; i++) {
+    const t = (i / (SAMPLES - 1)) * 2 - 1;
+    const off = t * SPREAD;
+    const clear = rayClear(player.x, player.y, player.angle + off, AUTO_TRIGGER + 1.5);
+    const score = clear * (1 - Math.abs(t) * 0.5);   // bias towards going straight
+    if (score > bestScore) { bestScore = score; bestOff = off; }
+  }
+  if (Math.abs(bestOff) < 0.06) return;              // deadzone stops jitter
+
+  const strength = Math.min(1, (AUTO_TRIGGER - ahead) / AUTO_TRIGGER);
+  const rate = AUTO_RATE * strength * Math.min(1, fwd);
+  player.angle += Math.sign(bestOff) * Math.min(Math.abs(bestOff), rate * dt);
+}
 function tryMove(ent, dx, dy, radius) {
   const r = radius || 0.22;
   const nx = ent.x + dx, ny = ent.y + dy;
@@ -1837,6 +1883,8 @@ function update(dt) {
   let turn = lookVec.x * TURN_SPEED;
   if (keys['arrowleft']) turn -= TURN_SPEED;
   if (keys['arrowright']) turn += TURN_SPEED;
+  // Manual aiming always wins; auto-steer stands down for a moment afterwards.
+  if (turn !== 0 || mouseDx !== 0) AUTO.suspend = 0.7;
   player.angle += turn * dt + mouseDx * 0.0024;
   mouseDx = 0;
 
@@ -1854,6 +1902,7 @@ function update(dt) {
       (cos * fwd - sin * strafe) * MOVE_SPEED * dt,
       (sin * fwd + cos * strafe) * MOVE_SPEED * dt, 0.22);
     player.bob += dt * 9.5 * Math.min(1, Math.hypot(fwd, strafe));
+    autoSteer(dt, fwd);
   } else {
     player.bob += dt * 1.2;
   }
@@ -1930,6 +1979,15 @@ document.getElementById('retryBtn').addEventListener('click', () => {
   gameRunning = true;
   AudioEngine.startMusic();
 });
+const autoBtn = document.getElementById('autoBtn');
+function toggleAuto() {
+  AUTO.on = !AUTO.on;
+  autoBtn.classList.toggle('off', !AUTO.on);
+  showMsg(AUTO.on ? 'AUTO-TURN ON' : 'AUTO-TURN OFF', 1.0);
+}
+autoBtn.addEventListener('click', toggleAuto);
+window.addEventListener('keydown', e => { if (e.key.toLowerCase() === 't') toggleAuto(); });
+
 document.getElementById('muteBtn').addEventListener('click', () => {
   Muted.on = !Muted.on;
   AudioEngine.setMuted(Muted.on);
